@@ -95,13 +95,18 @@ def run_scan(db, cfg, now=None, notify=True, sleep=0.0):
     started = iso(now)
     requests = offers_n = 0
     events, errors = [], []
+    fails, ok = {}, set()
     for p, dest, d in jobs:
+        if fails.get(p.name, 0) >= 5 and p.name not in ok:
+            continue  # provider is clearly broken this run – don't waste time on it
         try:
             offers = p.search(cfg["origin"], dest, d)
             requests += 1
             offers_n += len(offers)
             events += detector.process(p.name, dest, d, offers, now)
+            ok.add(p.name)
         except ProviderError as e:
+            fails[p.name] = fails.get(p.name, 0) + 1
             errors.append(f"{p.name} {dest} {d}: {e}")
             log.warning("%s %s %s: %s", p.name, dest, d, e)
         pause = sleep or sc.get("sleep_seconds", 0)
