@@ -1,6 +1,7 @@
 {
-  "_comment": "גרסה חינמית: Travelpayouts (חינם) סורק הכל כל שעה; SerpApi מוגבל ל-240 בדיקות בחודש (פחות מ-250 החינמיות) ומשמש לאימות חי של הדילים הזולים ביותר. מפתחות: SERPAPI_KEY, TRAVELPAYOUTS_TOKEN, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID",
+  "_comment": "מקור ראשי: Google Flights (חינם, בלי מפתח). Travelpayouts/SerpApi אופציונליים – נכנסים לפעולה רק אם מוגדר להם מפתח.",
   "providers": [
+    "google",
     "travelpayouts",
     "serpapi"
   ],
@@ -45,10 +46,11 @@
       330
     ],
     "last_minute_days": 7,
-    "max_free_requests_per_run": 60,
+    "max_free_requests_per_run": 45,
     "paid_monthly_limit": 240,
     "paid_daily_limit": 8,
-    "paid_per_run": 1
+    "paid_per_run": 1,
+    "sleep_seconds": 2
   },
   "alerts": {
     "price_drop_percent": 8,

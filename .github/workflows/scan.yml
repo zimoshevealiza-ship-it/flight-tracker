@@ -29,6 +29,9 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Install Google Flights reader
+        run: pip install "fast-flights==2.2"
+
       - name: Restore price history
         run: |
           mkdir -p data

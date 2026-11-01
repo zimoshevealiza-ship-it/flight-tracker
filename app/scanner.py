@@ -104,8 +104,9 @@ def run_scan(db, cfg, now=None, notify=True, sleep=0.0):
         except ProviderError as e:
             errors.append(f"{p.name} {dest} {d}: {e}")
             log.warning("%s %s %s: %s", p.name, dest, d, e)
-        if sleep:
-            time.sleep(sleep)
+        pause = sleep or sc.get("sleep_seconds", 0)
+        if pause and not cfg.get("_sim"):
+            time.sleep(pause)
 
     db.x("INSERT INTO runs(started_at,finished_at,requests,offers,events,errors) VALUES(?,?,?,?,?,?)",
          (started, iso(now_il() if not cfg.get("_sim") else now), requests, offers_n, len(events),
