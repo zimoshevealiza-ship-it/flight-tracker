@@ -64,8 +64,9 @@ class Detector:
                           (k, o.provider, o.airline, o.airline_name, o.flight_number, o.origin, o.destination,
                            o.depart_date, o.depart_time, o.stops, o.duration_min, ts, ts, o.price, o.price,
                            o.price, o.price, o.currency, o.link))
-                if not known_airline_route and self.db.one("SELECT 1 FROM offers WHERE destination=? AND key<>? LIMIT 1",
-                                                            (o.destination, k)):
+                if not known_airline_route and self.db.one(
+                        "SELECT 1 FROM route_scans WHERE destination=? AND first_scan <= datetime(?, '-3 days') LIMIT 1",
+                        (o.destination, ts)):
                     events.append(self._ev(now, "NEW_ROUTE", o, None, o.price,
                                            f"🆕 {o.airline_name} מתחילה לטוס ל-{o.destination}! "
                                            f"טיסה ראשונה שנמצאה: {o.depart_date} ב-{o.price:.0f} {o.currency}"))

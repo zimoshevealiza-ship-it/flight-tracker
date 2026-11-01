@@ -13,7 +13,7 @@ AIRLINE_CODES = {
     "brussels airlines": "SN", "air france": "AF", "klm": "KL", "british airways": "BA", "ita": "AZ",
     "ita airways": "AZ", "lot": "LO", "lot polish airlines": "LO", "tarom": "RO", "air europa": "UX",
     "iberia": "IB", "vueling": "VY", "tap air portugal": "TP", "air serbia": "JU", "bulgaria air": "FB",
-    "georgian airways": "A9", "smartwings": "QS", "blue bird airways": "BZ", "tus airways": "U8",
+    "georgian airways": "A9", "smartwings": "QS", "blue bird airways": "BZ", "bluebird": "BZ", "bluebird airways": "BZ", "tus airways": "U8",
     "cyprus airways": "CY", "emirates": "EK", "flydubai": "FZ", "etihad": "EY", "air india": "AI",
     "united": "UA", "delta": "DL", "american": "AA", "air canada": "AC", "turkish airlines": "TK",
     "pegasus": "PC", "sundair": "SR", "air seychelles": "HM", "ethiopian": "ET", "air baltic": "BT",
@@ -25,7 +25,11 @@ AIRLINE_CODES = {
 
 def _code(name):
     first = (name or "").split(",")[0].strip()
-    return AIRLINE_CODES.get(first.lower(), first[:12] or "??"), first
+    low = first.lower()
+    for suffix in (" airlines", " airways", " air lines", " israel airlines"):
+        if low.endswith(suffix) and low[: -len(suffix)] in AIRLINE_CODES:
+            low = low[: -len(suffix)]
+    return AIRLINE_CODES.get(low, first[:12] or "??"), first
 
 
 def _price(s):
@@ -127,7 +131,9 @@ class GoogleFlightsProvider(Provider):
             price = _price(getattr(f, "price", 0))
             if price <= 0:
                 continue
-            name = getattr(f, "name", "") or ""
+            name = (getattr(f, "name", "") or "").strip()
+            if not name or not getattr(f, "departure", ""):
+                continue  # Google's price-summary rows have no airline/time – skip them
             code, first = _code(name)
             dep = _time(getattr(f, "departure", ""))
             stops = getattr(f, "stops", 0)
