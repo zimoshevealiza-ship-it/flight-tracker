@@ -54,6 +54,44 @@ def _minutes(s):
     return (int(h.group(1)) * 60 if h else 0) + (int(m.group(1)) if m else 0)
 
 
+def _patch_impersonate():
+    """fast-flights 2.2 asks its HTTP client (primp) for the browser profile "chrome_126", which newer primp
+    releases removed. Swap in the first profile the installed primp accepts."""
+    try:
+        import fast_flights.core as core
+    except Exception:  # noqa
+        return
+    orig = getattr(core, "Client", None)
+    if orig is None or getattr(core, "_ft_patched", False):
+        return
+    chosen = {}
+
+    def client(*a, **kw):
+        if "v" not in chosen:
+            for cand in ("chrome", "chrome_133", "chrome_131", "chrome_130", "chrome_128", "chrome_127", "random", None):
+                try:
+                    kwc = dict(kw)
+                    if cand is None:
+                        kwc.pop("impersonate", None)
+                    else:
+                        kwc["impersonate"] = cand
+                    c = orig(*a, **kwc)
+                    chosen["v"] = cand
+                    return c
+                except Exception:  # noqa
+                    continue
+            raise ProviderError("no usable browser profile in primp")
+        kwc = dict(kw)
+        if chosen["v"] is None:
+            kwc.pop("impersonate", None)
+        else:
+            kwc["impersonate"] = chosen["v"]
+        return orig(*a, **kwc)
+
+    core.Client = client
+    core._ft_patched = True
+
+
 class GoogleFlightsProvider(Provider):
     name = "google"
     cost_per_search = 0
@@ -65,6 +103,7 @@ class GoogleFlightsProvider(Provider):
         except ImportError as e:
             raise ProviderError("pip install fast-flights==2.2") from e
         self._FD, self._P, self._get = FlightData, Passengers, get_flights
+        _patch_impersonate()
 
     def search(self, origin, destination, depart_date):
         last = None
