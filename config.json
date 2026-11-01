@@ -23,7 +23,11 @@
     "AMS",
     "DXB",
     "BKK",
-    "JFK"
+    "JFK",
+    "ORY",
+    "MXP",
+    "BGY",
+    "TRN"
   ],
   "scan": {
     "interval_minutes": 60,
@@ -46,11 +50,12 @@
       330
     ],
     "last_minute_days": 7,
-    "max_free_requests_per_run": 45,
+    "max_free_requests_per_run": 50,
     "paid_monthly_limit": 240,
     "paid_daily_limit": 8,
     "paid_per_run": 1,
-    "sleep_seconds": 2
+    "sleep_seconds": 2,
+    "priority_share": 0.6
   },
   "alerts": {
     "price_drop_percent": 8,
@@ -62,5 +67,12 @@
     "host": "0.0.0.0",
     "port": 8080
   },
-  "db_path": "data/flights.db"
+  "db_path": "data/flights.db",
+  "priority_destinations": [
+    "CDG",
+    "ORY",
+    "MXP",
+    "BGY",
+    "TRN"
+  ]
 }

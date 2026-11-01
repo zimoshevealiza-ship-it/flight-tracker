@@ -18,16 +18,20 @@ log = logging.getLogger("scanner")
 
 
 def _tasks(cfg, now):
-    dests = cfg["destinations"]
+    prio = list(dict.fromkeys(cfg.get("priority_destinations", [])))
+    dests = [d for d in cfg["destinations"] if d not in prio]
     if cfg.get("demo_mode"):
         dests = [d for d in dests if d in DIST] or list(DIST)
+        prio = [d for d in prio if d in DIST]
     lm = cfg["scan"].get("last_minute_days", 7)
-    near, far = [], []
+    near, far, top = [], [], []
     for days in cfg["scan"]["days_ahead"]:
         d = (now.date() + timedelta(days=days)).isoformat()
+        for dest in prio:
+            top.append((dest, d))
         for dest in dests:
             (near if days <= lm else far).append((dest, d))
-    return near, far
+    return near, far, top
 
 
 def _take(lst, cursor, n):
@@ -55,15 +59,20 @@ def run_scan(db, cfg, now=None, notify=True, sleep=0.0):
     paid = [p for p in providers if p.cost_per_search > 0]
 
     # ---- free providers: round-robin over all (destination, date) pairs ----
-    near, far = _tasks(cfg, now)
+    near, far, top = _tasks(cfg, now)
     n_free = sc.get("max_free_requests_per_run", 60)
+    # priority destinations get their own share of every run
+    c_top = int(db.get_state("cursor_top", 0)) % max(1, len(top))
+    t_top, c_top = _take(top, c_top, min(len(top), int(n_free * sc.get("priority_share", 0.6))))
+    db.set_state("cursor_top", c_top)
+    n_free -= len(t_top)
     c_near = int(db.get_state("cursor_near", 0)) % max(1, len(near))
     c_far = int(db.get_state("cursor_far", 0)) % max(1, len(far))
     t_near, c_near = _take(near, c_near, min(len(near), n_free // 2))
     t_far, c_far = _take(far, c_far, min(len(far), n_free - len(t_near)))
     db.set_state("cursor_near", c_near)
     db.set_state("cursor_far", c_far)
-    jobs = [(p, dest, d) for dest, d in t_near + t_far for p in free]
+    jobs = [(p, dest, d) for dest, d in t_top + t_near + t_far for p in free]
 
     # ---- paid providers (SerpApi): strict monthly/daily quota, used to verify the hottest deals live ----
     month, day = now.strftime("%Y-%m"), now.strftime("%Y-%m-%d")
@@ -86,7 +95,8 @@ def run_scan(db, cfg, now=None, notify=True, sleep=0.0):
                  if (c["destination"], c["depart_date"]) not in verified][:allow]
         if not picks:  # nothing from free sources yet - fall back to rotating last-minute dates
             c = int(db.get_state(f"cursor_{p.name}", 0))
-            picks, c = _take(near or far, c % max(1, len(near or far)), allow)
+            pool = top or near or far
+            picks, c = _take(pool, c % max(1, len(pool)), allow)
             db.set_state(f"cursor_{p.name}", c)
         jobs += [(p, dest, d) for dest, d in picks]
         db.set_state(f"quota_{p.name}_{month}", used_m + len(picks))
