@@ -1,0 +1,66 @@
+name: hourly-flight-scan
+
+on:
+  schedule:
+    - cron: "7 * * * *"      # every hour at :07 (UTC)
+  workflow_dispatch:          # "Run workflow" button for a manual scan
+
+permissions:
+  contents: write
+
+concurrency:
+  group: flight-scan
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      TZ: Asia/Jerusalem
+      SERPAPI_KEY: ${{ secrets.SERPAPI_KEY }}
+      TRAVELPAYOUTS_TOKEN: ${{ secrets.TRAVELPAYOUTS_TOKEN }}
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Restore price history
+        run: |
+          mkdir -p data
+          if git fetch --depth=1 origin data:refs/remotes/origin/data 2>/dev/null; then
+            git show origin/data:flights.db.gz > data/flights.db.gz && gunzip -f data/flights.db.gz
+          fi
+          ls -la data
+
+      - name: Scan prices
+        run: python -m app.main scan
+
+      - name: Build dashboard
+        run: python -m app.main export site
+
+      - name: Save history + publish dashboard
+        run: |
+          git config --global user.name  "flight-bot"
+          git config --global user.email "flight-bot@users.noreply.github.com"
+          REMOTE="https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}"
+
+          # history -> single-commit "data" branch (overwritten each run, so the repo never grows)
+          tmp=$(mktemp -d)
+          gzip -c data/flights.db > "$tmp/flights.db.gz"
+          (cd "$tmp" && git init -q -b data && git add . && git commit -qm "history $(date -Iminutes)" && git push -qf "$REMOTE" data)
+
+          # dashboard -> "gh-pages" branch
+          (cd site && git init -q -b gh-pages && git add -A && git commit -qm "dashboard $(date -Iminutes)" && git push -qf "$REMOTE" gh-pages)
+
+      - name: Keep schedule alive
+        # GitHub pauses scheduled workflows after 60 days without commits; one small commit a week prevents that
+        run: |
+          if [ "$(date +%u%H)" = "703" ]; then
+            date -Iminutes > last_scan.txt
+            git add last_scan.txt && git commit -qm "weekly keep-alive" && git push -q
+          fi

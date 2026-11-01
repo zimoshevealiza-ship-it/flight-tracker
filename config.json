@@ -1,0 +1,64 @@
+{
+  "_comment": "גרסה חינמית: Travelpayouts (חינם) סורק הכל כל שעה; SerpApi מוגבל ל-240 בדיקות בחודש (פחות מ-250 החינמיות) ומשמש לאימות חי של הדילים הזולים ביותר. מפתחות: SERPAPI_KEY, TRAVELPAYOUTS_TOKEN, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID",
+  "providers": [
+    "travelpayouts",
+    "serpapi"
+  ],
+  "demo_mode": false,
+  "origin": "TLV",
+  "currency": "USD",
+  "destinations": [
+    "ATH",
+    "LCA",
+    "RHO",
+    "BUD",
+    "PRG",
+    "VIE",
+    "FCO",
+    "BCN",
+    "CDG",
+    "LHR",
+    "BER",
+    "AMS",
+    "DXB",
+    "BKK",
+    "JFK"
+  ],
+  "scan": {
+    "interval_minutes": 60,
+    "days_ahead": [
+      1,
+      2,
+      3,
+      5,
+      7,
+      10,
+      14,
+      21,
+      30,
+      45,
+      60,
+      90,
+      120,
+      180,
+      270,
+      330
+    ],
+    "last_minute_days": 7,
+    "max_free_requests_per_run": 60,
+    "paid_monthly_limit": 240,
+    "paid_daily_limit": 8,
+    "paid_per_run": 1
+  },
+  "alerts": {
+    "price_drop_percent": 8,
+    "min_drop_amount": 15,
+    "last_minute_percentile": 0.25,
+    "telegram": true
+  },
+  "web": {
+    "host": "0.0.0.0",
+    "port": 8080
+  },
+  "db_path": "data/flights.db"
+}
