@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>מעקב טיסות מישראל</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root{--bg:#f4f6fa;--card:#fff;--ink:#14213d;--mute:#6b7690;--line:#e3e7ef;--acc:#1f6feb;--good:#0f9d58;--bad:#d93025;--warn:#e8a400}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:"Segoe UI",Arial,"Noto Sans Hebrew",sans-serif;background:var(--bg);color:var(--ink)}
+  header{background:var(--ink);color:#fff;padding:18px 28px;display:flex;align-items:center;gap:20px;flex-wrap:wrap}
+  header h1{margin:0;font-size:22px;font-weight:600}
+  header .sub{color:#aab4cc;font-size:13px}
+  header button{margin-inline-start:auto;background:var(--acc);color:#fff;border:0;border-radius:8px;padding:9px 16px;font-size:14px;cursor:pointer}
+  header button:disabled{opacity:.6}
+  .demo{background:var(--warn);color:#000;border-radius:6px;padding:2px 8px;font-size:12px;font-weight:600}
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px;padding:20px 28px 0}
+  .stat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+  .stat b{display:block;font-size:24px;margin-top:4px}
+  .stat span{color:var(--mute);font-size:13px}
+  nav{display:flex;gap:6px;padding:20px 28px 0;flex-wrap:wrap}
+  nav button{background:transparent;border:1px solid var(--line);border-radius:999px;padding:8px 16px;cursor:pointer;font-size:14px;color:var(--ink)}
+  nav button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+  main{padding:18px 28px 40px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:16px}
+  .filters{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+  select,input{border:1px solid var(--line);border-radius:8px;padding:7px 10px;font-size:14px;background:#fff}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th{text-align:right;color:var(--mute);font-weight:500;border-bottom:1px solid var(--line);padding:8px 6px}
+  td{border-bottom:1px solid var(--line);padding:9px 6px}
+  tr.click{cursor:pointer} tr.click:hover{background:#f7f9fd}
+  .price{font-weight:700;font-variant-numeric:tabular-nums}
+  .tag{display:inline-block;border-radius:6px;padding:2px 8px;font-size:12px;font-weight:600}
+  .t-NEW_FLIGHT{background:#e7f0ff;color:#1f4fbf}.t-NEW_ROUTE{background:#efe7ff;color:#5b2fbf}
+  .t-PRICE_DROP{background:#e5f6ec;color:#0b7a43}.t-RECORD_LOW{background:#fff4d6;color:#8a5a00}
+  .t-LAST_MINUTE{background:#ffe8e6;color:#b3261e}
+  .adv-buy{color:var(--good);font-weight:600}.adv-wait{color:var(--warn);font-weight:600}.adv-unknown{color:var(--mute)}
+  .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(420px,1fr));gap:16px}
+  .air h3{margin:0 0 4px}.air ul{margin:8px 0 12px;padding-inline-start:18px;line-height:1.7;font-size:14px}
+  .muted{color:var(--mute);font-size:13px}
+  .modal{position:fixed;inset:0;background:rgba(10,20,40,.45);display:none;align-items:center;justify-content:center;padding:20px}
+  .modal .box{background:#fff;border-radius:14px;max-width:760px;width:100%;padding:20px;max-height:90vh;overflow:auto}
+  .x{float:left;border:0;background:none;font-size:22px;cursor:pointer}
+  .empty{color:var(--mute);text-align:center;padding:30px}
+  a{color:var(--acc)}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>✈ מעקב טיסות מישראל</h1>
+    <div class="sub" id="sub">טוען…</div>
+  </div>
+  <span id="demo" class="demo" style="display:none">מצב הדגמה – נתונים מדומים</span>
+  <button id="scanBtn" onclick="scanNow()">סרוק עכשיו</button>
+</header>
+
+<section class="stats" id="stats"></section>
+
+<nav>
+  <button data-tab="events" class="on">התראות</button>
+  <button data-tab="deals">חיפוש טיסות ודילים</button>
+  <button data-tab="dest">יעדים – המחיר הזול ביותר</button>
+  <button data-tab="air">איך כל חברה מתמחרת</button>
+  <button data-tab="runs">יומן סריקות</button>
+</nav>
+
+<main>
+  <section id="tab-events">
+    <div class="card">
+      <div class="filters">
+        <select id="evType" onchange="loadEvents()">
+          <option value="">כל סוגי ההתראות</option>
+          <option value="NEW_FLIGHT">טיסה חדשה פורסמה</option>
+          <option value="NEW_ROUTE">קו חדש</option>
+          <option value="PRICE_DROP">ירידת מחיר</option>
+          <option value="RECORD_LOW">שפל מחיר</option>
+          <option value="LAST_MINUTE">רגע אחרון</option>
+        </select>
+        <select id="evDest" onchange="loadEvents()"><option value="">כל היעדים</option></select>
+      </div>
+      <table><thead><tr><th>זמן</th><th>סוג</th><th>פירוט</th></tr></thead><tbody id="events"></tbody></table>
+    </div>
+  </section>
+
+  <section id="tab-deals" style="display:none">
+    <div class="card">
+      <div class="filters">
+        <select id="dDest"><option value="">כל היעדים</option></select>
+        <select id="dAir"><option value="">כל החברות</option></select>
+        <select id="dWin">
+          <option value="0-400">כל התאריכים</option>
+          <option value="0-7">רגע אחרון (עד 7 ימים)</option>
+          <option value="8-30">8–30 ימים</option>
+          <option value="31-90">1–3 חודשים</option>
+          <option value="91-400">3 חודשים ומעלה</option>
+        </select>
+        <label><input type="checkbox" id="dDirect"> ישירות בלבד</label>
+        <button onclick="loadDeals()" style="border:0;background:var(--acc);color:#fff;border-radius:8px;padding:8px 14px;cursor:pointer">חפש</button>
+      </div>
+      <table><thead><tr><th>יעד</th><th>חברה</th><th>טיסה</th><th>תאריך</th><th>עוד</th><th>מחיר</th><th>שפל</th><th>המלצה</th></tr></thead>
+        <tbody id="deals"></tbody></table>
+    </div>
+  </section>
+
+  <section id="tab-dest" style="display:none">
+    <div class="card"><canvas id="destChart" height="110"></canvas></div>
+    <div class="card"><table><thead><tr><th>יעד</th><th>המחיר הזול</th><th>חברה</th><th>תאריך</th><th>טיסות במעקב</th></tr></thead><tbody id="dest"></tbody></table></div>
+  </section>
+
+  <section id="tab-air" style="display:none">
+    <p class="muted">המערכת לומדת מכל בדיקה. מחיר יחסי 1.00 = מחיר ממוצע של אותה טיסה; מתחת ל-1 זה זול מהרגיל.</p>
+    <div class="grid2" id="airlines"></div>
+  </section>
+
+  <section id="tab-runs" style="display:none">
+    <div class="card"><table><thead><tr><th>התחלה</th><th>בקשות</th><th>הצעות</th><th>התראות</th><th>שגיאות</th></tr></thead><tbody id="runs"></tbody></table></div>
+  </section>
+</main>
+
+<div class="modal" id="modal" onclick="if(event.target===this)this.style.display='none'">
+  <div class="box"><button class="x" onclick="modal.style.display='none'">×</button><div id="mBody"></div><canvas id="mChart" height="120"></canvas></div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const TYPES = {NEW_FLIGHT:'טיסה חדשה',NEW_ROUTE:'קו חדש',PRICE_DROP:'ירידת מחיר',RECORD_LOW:'שפל',LAST_MINUTE:'רגע אחרון'};
+let CUR = 'USD', charts = {};
+let STATIC = null, CACHE = {};
+function fnv(str) { let h = 0x811c9dc5; for (const b of new TextEncoder().encode(str)) { h ^= b; h = Math.imul(h, 0x01000193) >>> 0; } return h.toString(16).padStart(8, '0'); }
+const file = n => CACHE[n] || (CACHE[n] = fetch('data/' + n + '?t=' + Math.floor(Date.now() / 300000)).then(r => r.ok ? r.json() : null));
+async function api(p) {
+  if (STATIC === null) STATIC = fetch('api/summary').then(r => !(r.ok && (r.headers.get('content-type') || '').includes('json'))).catch(() => true);
+  if (STATIC instanceof Promise) STATIC = await STATIC;
+  if (!STATIC) return fetch(p).then(r => r.json());
+  const u = new URL(p, location.origin), q = Object.fromEntries(u.searchParams), name = u.pathname.split('/').pop();
+  if (name === 'offer') return file('offer/' + fnv(q.key) + '.json');
+  let d = await file(name + '.json');
+  if (name === 'events') d = d.filter(e => (!q.type || e.type === q.type) && (!q.dest || e.destination === q.dest)).slice(0, 150);
+  if (name === 'deals') {
+    const today = new Date().toISOString().slice(0, 10), day = 864e5;
+    d = d.map(r => ({...r, days_to_dep: Math.round((new Date(r.depart_date) - new Date(today)) / day)}))
+         .filter(r => r.depart_date >= today && r.days_to_dep >= +(q.min_days || 0) && r.days_to_dep <= +(q.max_days || 400)
+                 && (!q.dest || r.destination === q.dest) && (!q.airline || r.airline === q.airline) && (q.direct !== '1' || r.stops === 0)).slice(0, 300);
+  }
+  return d;
+}
+const money = v => v == null ? '–' : Math.round(v).toLocaleString('he-IL') + ' ' + CUR;
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('nav button').forEach(x => x.classList.toggle('on', x === b));
+  document.querySelectorAll('main > section').forEach(s => s.style.display = s.id === 'tab-' + b.dataset.tab ? '' : 'none');
+  ({events: loadEvents, deals: loadDeals, dest: loadDest, air: loadAir, runs: loadRuns})[b.dataset.tab]();
+});
+
+async function loadSummary() {
+  const s = await api('api/summary'); CUR = s.currency;
+  if (STATIC) { $('scanBtn').textContent = 'מתעדכן אוטומטית כל שעה'; $('scanBtn').disabled = true; }
+  $('demo').style.display = s.demo ? '' : 'none';
+  $('sub').textContent = `יציאה מ-${s.origin} · סריקה כל ${s.interval} דקות · סריקה אחרונה: ${s.last_run ? s.last_run.started_at : 'עדיין לא'}`;
+  $('stats').innerHTML = [
+    ['טיסות במעקב', s.offers], ['בדיקות מחיר שנשמרו', s.observations],
+    ['התראות ב-24 שעות', s.events_24h], ['חברות תעופה', s.airlines]
+  ].map(([l, v]) => `<div class="stat"><span>${l}</span><b>${(v||0).toLocaleString('he-IL')}</b></div>`).join('');
+}
+
+async function loadMeta() {
+  const m = await api('api/meta');
+  const d = m.destinations.map(x => `<option>${x}</option>`).join('');
+  $('evDest').innerHTML = '<option value="">כל היעדים</option>' + d;
+  $('dDest').innerHTML = '<option value="">כל היעדים</option>' + d;
+  $('dAir').innerHTML = '<option value="">כל החברות</option>' + m.airlines.map(a => `<option value="${a.airline}">${esc(a.name)}</option>`).join('');
+}
+
+async function loadEvents() {
+  const q = new URLSearchParams({type: $('evType').value, dest: $('evDest').value});
+  const rows = await api('api/events?' + q);
+  $('events').innerHTML = rows.length ? rows.map(e => `<tr class="click" onclick="openOffer('${encodeURIComponent(e.offer_key)}')">
+    <td class="muted">${e.created_at.slice(5,16)}</td><td><span class="tag t-${e.type}">${TYPES[e.type]||e.type}</span></td><td>${esc(e.message)}</td></tr>`).join('')
+    : '<tr><td colspan=3 class="empty">אין עדיין התראות – הן יופיעו אחרי כמה סריקות</td></tr>';
+}
+
+async function loadDeals() {
+  const [a, b] = $('dWin').value.split('-');
+  const q = new URLSearchParams({dest: $('dDest').value, airline: $('dAir').value, min_days: a, max_days: b, direct: $('dDirect').checked ? 1 : ''});
+  const rows = await api('api/deals?' + q);
+  $('deals').innerHTML = rows.length ? rows.map(r => `<tr class="click" onclick="openOffer('${encodeURIComponent(r.key)}')">
+    <td><b>${r.destination}</b></td><td>${esc(r.airline_name)}</td><td class="muted">${esc(r.flight_number)} · ${r.depart_time||''}${r.stops?` · ${r.stops} עצירות`:''}</td>
+    <td>${r.depart_date}</td><td class="muted">${r.days_to_dep} ימים</td><td class="price">${money(r.last_price)}</td>
+    <td class="muted">${money(r.min_price)}</td><td class="adv-${r.advice.advice}">${r.advice.advice==='buy'?'לקנות':r.advice.advice==='wait'?'לחכות':'–'}</td></tr>`).join('')
+    : '<tr><td colspan=8 class="empty">לא נמצאו טיסות</td></tr>';
+}
+
+async function loadDest() {
+  const rows = await api('api/cheapest');
+  $('dest').innerHTML = rows.map(r => `<tr><td><b>${r.destination}</b></td><td class="price">${money(r.price)}</td><td>${esc(r.airline)}</td><td>${r.depart_date}</td><td class="muted">${r.flights}</td></tr>`).join('');
+  draw('destChart', 'bar', rows.map(r => r.destination), [{label: 'המחיר הזול ביותר', data: rows.map(r => r.price), backgroundColor: '#1f6feb'}]);
+}
+
+async function loadAir() {
+  const list = await api('api/airlines');
+  if (!list.length) { $('airlines').innerHTML = '<div class="card empty">צריך עוד נתונים – הלמידה מתחילה אחרי כמה עשרות בדיקות לכל חברה</div>'; return; }
+  $('airlines').innerHTML = list.map((p, i) => `<div class="card air"><h3>${esc(p.name)} <span class="muted">(${p.airline})</span></h3>
+    <div class="muted">${p.flights_tracked} טיסות · ${p.observations.toLocaleString('he-IL')} בדיקות מחיר</div>
+    <ul>${p.summary.map(s => `<li>${esc(s)}</li>`).join('')}</ul>
+    <canvas id="ac${i}" height="150"></canvas><canvas id="ah${i}" height="90" style="margin-top:10px"></canvas></div>`).join('');
+  list.forEach((p, i) => {
+    draw('ac' + i, 'line', p.curve.map(c => c.bucket + ' ימים'), [{label: 'מחיר יחסי לפי ימים לפני הטיסה', data: p.curve.map(c => c.median), borderColor: '#1f6feb', tension: .3, spanGaps: true}], {reverse: true});
+    draw('ah' + i, 'bar', [...Array(24).keys()].map(h => h + ':00'), [{label: 'ירידות מחיר לפי שעה', data: p.drop_hours, backgroundColor: '#0f9d58'}]);
+  });
+}
+
+async function loadRuns() {
+  const rows = await api('api/runs');
+  $('runs').innerHTML = rows.map(r => `<tr><td>${r.started_at}</td><td>${r.requests}</td><td>${r.offers}</td><td>${r.events}</td><td class="muted">${esc(JSON.parse(r.errors||'[]').slice(0,2).join(' | '))}</td></tr>`).join('');
+}
+
+async function openOffer(k) {
+  const o = await api('api/offer?key=' + k);
+  if (!o) return;
+  $('mBody').innerHTML = `<h2 style="margin-top:0">${esc(o.airline_name)} ${esc(o.flight_number)} · ${o.origin} → ${o.destination}</h2>
+    <p>${o.depart_date} ${o.depart_time||''} · מחיר נוכחי <b>${money(o.last_price)}</b> · שפל ${money(o.min_price)} · שיא ${money(o.max_price)}</p>
+    <p>פורסמה לראשונה במעקב: ${o.first_seen} (${money(o.first_price)})</p>
+    <p class="adv-${o.advice.advice}">${esc(o.advice.text)}</p>${o.link ? `<p><a href="${esc(o.link)}" target="_blank" rel="noopener">לעמוד ההזמנה</a></p>` : ''}`;
+  $('modal').style.display = 'flex';
+  draw('mChart', 'line', o.history.map(h => h.observed_at.slice(5,16)), [{label: 'היסטוריית מחיר', data: o.history.map(h => h.price), borderColor: '#d93025', stepped: true, pointRadius: 0}]);
+}
+
+function draw(id, type, labels, datasets, opt = {}) {
+  if (charts[id]) charts[id].destroy();
+  if (typeof Chart === 'undefined') return;
+  charts[id] = new Chart($(id), {type, data: {labels, datasets}, options: {plugins: {legend: {display: true}}, scales: {x: {reverse: !!opt.reverse}}, animation: false}});
+}
+
+async function scanNow() {
+  $('scanBtn').disabled = true; $('scanBtn').textContent = 'סורק…';
+  try { const r = await fetch('api/scan', {method: 'POST'}).then(r => r.json());
+        $('scanBtn').textContent = r.busy ? 'סריקה כבר רצה' : `נמצאו ${r.offers} הצעות, ${r.events} התראות`; }
+  finally { setTimeout(() => { $('scanBtn').disabled = false; $('scanBtn').textContent = 'סרוק עכשיו'; }, 3000);
+            loadSummary(); loadMeta(); loadEvents(); }
+}
+
+loadSummary(); loadMeta(); loadEvents();
+setInterval(() => { loadSummary(); }, 60000);
+</script>
+</body>
+</html>
