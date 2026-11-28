@@ -1,0 +1,1 @@
+{"offers": 120431, "observations": 338468, "events_24h": 2788, "airlines": 40, "last_run": {"id": 551, "started_at": "2026-11-28 16:06:49", "finished_at": "2026-11-28 16:08:54", "requests": 50, "offers": 343, "events": 105, "errors": "[]"}, "demo": false, "origin": "TLV", "currency": "USD", "interval": 60}
